@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>نمایش محصول در محیط واقعی - LIZAKO</title>
+
+<style>
+html, body {
+  margin: 0; padding: 0;
+  height: 100%; overflow: hidden;
+  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #e0f7fa, #fce4ec);
+}
+
+/* ویدیو پس‌زمینه */
+#video {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  z-index: 1;
+  filter: brightness(0.95);
+}
+
+/* لوگوی سه‌بعدی */
+#brand {
+  position: fixed;
+  top: 10px; right: 10px;
+  font-size: clamp(18px, 5vw, 32px);
+  font-weight: bold;
+  color: #ff4081;
+  text-shadow: 1px 1px 0 #fff, 2px 2px 0 #ff80ab, 3px 3px 0 #f50057;
+  animation: float 3s ease-in-out infinite;
+  z-index: 5;
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotateY(0deg); }
+  50% { transform: translateY(-5px) rotateY(15deg); }
+}
+
+/* تصویر محصول */
+#overlay {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(1);
+  z-index: 2;
+  display: none;
+  max-width: 80vw;
+  max-height: 80vh;
+  cursor: grab;
+  transition: transform 0.2s ease;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
+
+/* کنترل‌ها */
+#controls {
+  position: fixed;
+  top: 10px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,0.8);
+  backdrop-filter: blur(8px);
+  padding: 8px 12px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  z-index: 3;
+  display: none;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+#controls label { font-size: 14px; }
+#controls input[type=range] { vertical-align: middle; }
+#capture {
+  padding: 6px 12px;
+  font-size: 14px;
+  background: #ff4081;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+/* نوار محصولات شیشه‌ای */
+.carousel-container {
+  position: fixed;
+  bottom: 0; left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  background: rgba(255,255,255,0.25);
+  backdrop-filter: blur(12px);
+  z-index: 4;
+}
+.arrow {
+  flex: 0 0 auto;
+  font-size: 28px;
+  color: #ff4081;
+  padding: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+#carousel {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  flex: 1;
+  padding: 14px 0;
+}
+#carousel::-webkit-scrollbar { display: none; }
+
+#carousel img {
+  height: 70px;
+  margin: 0 10px;
+  border: 3px solid transparent;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: transform 0.25s ease, border-color 0.25s, margin-top 0.25s;
+}
+#carousel img:hover {
+  transform: scale(1.05);
+}
+#carousel img.selected {
+  border-color: #ff4081;
+  margin-top: -10px;
+  box-shadow: 0 4px 12px rgba(255,64,129,0.5);
+}
+
+/* ریسپانسیو */
+@media (max-width: 600px) {
+  #controls {
+    top: auto;
+    bottom: 90px;
+    flex-direction: column;
+    align-items: center;
+  }
+  #carousel img {
+    height: 60px;
+  }
+}
+</style>
+</head>
+<body>
+
+<video id="video" autoplay playsinline></video>
+<div id="brand">LIZAKO</div>
+
+<img id="overlay" src="" alt="محصول">
+
+<div id="controls">
+  <label>اندازه:
+    <input type="range" id="scale" min="0.3" max="2" step="0.01" value="1">
+  </label>
+  <button id="capture">📸 گرفتن عکس</button>
+</div>
+
+<div class="carousel-container">
+  <div class="arrow" id="leftArrow">❮</div>
+  <div id="carousel">
+    <img src="ka.png" data-src="ka.png" alt="ka">
+    <img src="kb.png" data-src="kb.png" alt="kb">
+    <img src="kc.png" data-src="kc.png" alt="kc">
+    <img src="kd.png" data-src="kd.png" alt="kd">
+    <img src="kg.png" data-src="kg.png" alt="kg">
+    <img src="kh.png" data-src="kh.png" alt="kh">
+    <img src="ki.png" data-src="ki.png" alt="ki">
+    <img src="kj.png" data-src="kj.png" alt="kj">
+    <img src="kl.png" data-src="kl.png" alt="kl">
+  </div>
+  <div class="arrow" id="rightArrow">❯</div>
+</div>
+
+<canvas id="canvas" style="display:none;"></canvas>
+
+<script>
+const video = document.getElementById('video');
+const overlay = document.getElementById('overlay');
+const carousel = document.getElementById('carousel');
+const controls = document.getElementById('controls');
+const scaleSlider = document.getElementById('scale');
+const captureBtn = document.getElementById('capture');
+const canvas = document.getElementById('canvas');
+const leftArrow = document.getElementById('leftArrow');
+const rightArrow = document.getElementById('rightArrow');
+
+let scaleVal = 1;
+let isDragging = false, startX, startY, origX, origY;
+
+// فعال‌سازی دوربین
+navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+  .then(stream => video.srcObject = stream)
+  .catch(err => alert('دسترسی به دوربین ممکن نیست: ' + err));
+
+// انتخاب محصول
+carousel.addEventListener('click', e => {
+  const img = e.target.closest('img');
+  if (!img) return;
+  carousel.querySelectorAll('img').forEach(i => i.classList.remove('selected'));
+  img.classList.add('selected');
+  overlay.src = img.dataset.src;
+  overlay.style.display = 'block';
+  controls.style.display = 'flex';
+  overlay.style.top = '50%';
+  overlay.style.left = '50%';
+  scaleVal = 1;
+  scaleSlider.value = scaleVal;
+  updateTransform();
+});
+
+// تغییر اندازه
+scaleSlider.addEventListener('input', () => {
+  scaleVal = parseFloat(scaleSlider.value);
+  updateTransform();
+});
+function updateTransform() {
+  overlay.style.transform = `translate(-50%, -50%) scale(${scaleVal})`;
+}
+
+// جابه‌جایی
+overlay.addEventListener('mousedown', startDrag);
+overlay.addEventListener('touchstart', startDrag);
+function startDrag(e) {
+  e.preventDefault();
+  isDragging = true;
+  startX = e.touches ? e.touches[0].clientX : e.clientX;
+  startY = e.touches ? e.touches[0].clientY : e.clientY;
+  const rect = overlay.getBoundingClientRect();
+  origX = rect.left;
+  origY = rect.top;
+}
+window.addEventListener('mousemove', drag);
+window.addEventListener('touchmove', drag);
+function drag(e) {
+  if (!isDragging) return;
+  const x = e.touches ? e.touches[0].clientX : e.clientX;
+  const y = e.touches ? e.touches[0].clientY : e.clientY;
+  overlay.style.left = (origX + (x - startX) + overlay.width/2) + 'px';
+  overlay.style.top = (origY +
